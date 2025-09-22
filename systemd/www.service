@@ -21,9 +21,9 @@ Group=caddy
 Environment="HOSTNAME=%H"
 Environment="TIR_NA_NOG_ENV=prod"
 #EnvironmentFile=/www/tir-na-nog/*.env
-ExecStartPre=/usr/bin/caddy validate --config /www/tir-na-nog/Caddyfile-prod
-ExecStart=/usr/bin/caddy run --environ --config /www/tir-na-nog/Caddyfile-prod
-ExecReload=/usr/bin/caddy reload --config /www/tir-na-nog/Caddyfile-prod
+ExecStartPre=/usr/bin/caddy validate --config /www/caddy/Caddyfile
+ExecStart=/usr/bin/caddy run --environ --config /www/caddy/Caddyfile
+ExecReload=/usr/bin/caddy reload --config /www/caddy/Caddyfile
 TimeoutStopSec=5s
 LimitNOFILE=1048576
 PrivateTmp=true
