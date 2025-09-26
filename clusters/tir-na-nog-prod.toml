@@ -1,0 +1,7 @@
+[www]
+http_port = 80
+https_port = 443
+#hostname = 'tir-na-nog.den-antares.com'
+
+[service.auth]
+port = 7001

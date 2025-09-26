@@ -1,0 +1,16 @@
+[www]
+http_port = 8080
+https_port = 8443
+#hostname = 'tir-na-nog.den-antares.com'
+logfile = 'access-test.log'
+
+[service.tir-na-nog-auth]
+port = 9000
+
+# Needs:
+# - Overall prod/dev/test Caddyfile
+#
+# - Install script for each service
+# - Unit file for each service
+# - Dev/test makefile for each service
+# - Caddyfile amendments for each service
