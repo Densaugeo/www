@@ -14,13 +14,23 @@ ifeq "$(shell id --name --groups $$USER | grep --count www)" "0"
 ADD_GROUP_WWW=1
 endif
 
-install: /www \
+install: caddy-installed.txt \
+	/www \
 	/www/systemd/www.service \
 	/www/caddy/Caddyfile-dev /www/caddy/Caddyfile-prod \
 	/www/test-cert.pem \
 	notices
 
-/www:
+caddy-installed.txt:
+	# Need the COPR repo from Caddy because the version in the main Fedora
+	# repo is too old - I use the log file mode option which was fixed in
+	# version 2.9.0
+	sudo dnf install -y dnf5-plugins
+	sudo dnf copr enable -y @caddy/caddy
+	sudo dnf install -y caddy
+	sudo dnf info --installed caddy > caddy-installed.txt
+
+/www: caddy-installed.txt
 	@# Written for Fedora
 	@#sudo dnf install -y caddy
 	@#sudo setsebool -P nis_enabled 1
@@ -119,5 +129,7 @@ endif
 	sudo chcon -u system_u -t cert_t /www/*.pem
 
 clean:
-	sudo rm -rf /www
+	for FILE in $$(ls systemd); do sudo systemctl stop $$FILE; done
+	for FILE in $$(ls systemd); do sudo systemctl disable $$FILE; done
 	sudo rm /etc/systemd/system/www.service
+	sudo rm -rf /www

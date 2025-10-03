@@ -31,7 +31,9 @@ https://localhost {{
 	}}
 
 	log {{
-		output file /www/logs/access-{ENVIRONMENT}.log
+		output file /www/logs/access-{ENVIRONMENT}.log {{
+			mode 0644
+		}}
 		format json
 	}}
 
