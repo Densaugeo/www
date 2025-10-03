@@ -18,12 +18,12 @@ Type=notify
 User=caddy
 Group=caddy
 # $HOSTNAME isn't available inside Caddyfile without this trick
-Environment="HOSTNAME=%H"
-Environment="TIR_NA_NOG_ENV=prod"
+#Environment="HOSTNAME=%H"
+#Environment="TIR_NA_NOG_ENV=prod"
 #EnvironmentFile=/www/tir-na-nog/*.env
-ExecStartPre=/usr/bin/caddy validate --config /www/caddy/Caddyfile
-ExecStart=/usr/bin/caddy run --environ --config /www/caddy/Caddyfile
-ExecReload=/usr/bin/caddy reload --config /www/caddy/Caddyfile
+ExecStartPre=/usr/bin/caddy validate --config /www/caddy/Caddyfile-prod
+ExecStart=/usr/bin/caddy run --environ --config /www/caddy/Caddyfile-prod
+ExecReload=/usr/bin/caddy reload --config /www/caddy/Caddyfile-prod
 TimeoutStopSec=5s
 LimitNOFILE=1048576
 PrivateTmp=true
