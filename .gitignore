@@ -2,3 +2,4 @@ logs/*.log
 *.pem
 *.kate-swp
 caddy-installed.txt
+selinux-configured.txt

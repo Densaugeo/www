@@ -8,18 +8,16 @@ AQUA=\x1b[38;2;26;186;151m
 BLUE=\x1b[38;2;68;170;221m
 ORANGE=\x1b[38;2;236;182;74m
 
-.PHONY: notices clean
-
 ifeq "$(shell id --name --groups $$USER | grep --count www)" "0"
 ADD_GROUP_WWW=1
 endif
 
 install: caddy-installed.txt \
+	selinux-configured.txt \
 	/www \
 	/www/systemd/www.service \
-	/www/caddy/Caddyfile-dev /www/caddy/Caddyfile-prod \
-	/www/test-cert.pem \
 	notices
+	@# Written for Fedora
 
 caddy-installed.txt:
 	# Need the COPR repo from Caddy because the version in the main Fedora
@@ -30,15 +28,24 @@ caddy-installed.txt:
 	sudo dnf install -y caddy
 	sudo dnf info --installed caddy > caddy-installed.txt
 
-/www: caddy-installed.txt
-	@# Written for Fedora
-	@#sudo dnf install -y caddy
-	@#sudo setsebool -P nis_enabled 1
-	@#sudo setsebool -P httpd_use_fusefs 1
+selinux-configured.txt:
+	sudo setsebool -P nis_enabled 1
+	sudo setsebool -P httpd_use_fusefs 1
 	@# Allows Caddy to access files labeled user_home_t. This is essential
 	@# because this label is often applied to new files
-	@#sudo setsebool -P httpd_read_user_content 1
+	sudo setsebool -P httpd_read_user_content 1
 	
+	sudo semanage fcontext -a -t httpd_sys_content_t    "/www(/.*)?"
+	sudo semanage fcontext -a -t httpd_config_t         "/www/caddy(/.*)?"
+	@# SELinux offers a log type `httpd_log_t`, but it is useless because it
+	@# does not allow writing to the logs
+	sudo semanage fcontext -a -t httpd_sys_rw_content_t "/www/logs(/.*)?"
+	sudo semanage fcontext -a -t systemd_unit_file_t    "/www/systemd(/.*)?"
+	sudo semanage fcontext -a -t cert_t                 "/www/.*.pem"
+	
+	touch selinux-configured.txt
+
+/www: caddy-installed.txt selinux-configured.txt
 	@# Must be able to run caddy with no password for make dev
 	@#echo "$$USER ALL = (caddy) NOPASSWD:$$(which caddy) run --envfile @config.env"\
 	#	| sudo EDITOR=tee visudo -f /etc/sudoers.d/tir-na-nog
@@ -49,46 +56,16 @@ ifdef ADD_GROUP_WWW
 endif
 
 	sudo mkdir -p /www
-	sudo chown www:www /www
-	sudo chmod 775 /www
-	sudo chcon -u system_u -t httpd_sys_content_t /www
-	@# Note: httpd_sys_rw_content_t is also available for content that Caddy
-	@# needs to be able to write
+	sudo chmod 2775 /www
+	sudo chgrp www /www
+	
 	@#mkdir -p files/restricted
 	
-	sudo mkdir -p /www/caddy
-	sudo chown www:www /www/caddy
-	sudo chmod 775 /www/caddy
-	sudo chcon -u system_u -t httpd_config_t /www/caddy
+	cd /www && mkdir caddy caddy/include logs root systemd
+	chmod 775 /www/*
+	sudo chown caddy /www/logs
 	
-	sudo mkdir -p /www/caddy/include
-	sudo chown www:www /www/caddy/include
-	sudo chmod 775 /www/caddy/include
-	sudo chcon -u system_u -t httpd_config_t /www/caddy/include
-	
-	sudo mkdir -p /www/logs
-	sudo chown caddy:caddy /www/logs
-	@# SELinux offers a log type `httpd_log_t`, but it is useless because it
-	@# does not allow writing to the logs
-	sudo chcon -u system_u -t httpd_sys_rw_content_t /www/logs
-	
-	sudo mkdir -p /www/root
-	sudo chown www:www /www/root
-	sudo chmod 775 /www/root
-	sudo chcon -u system_u -t httpd_sys_content_t /www/root
-	
-	sudo mkdir -p /www/systemd
-	sudo chown www:www /www/systemd
-	sudo chmod 775 /www/systemd
-	sudo chcon -u system_u -t systemd_unit_file_t /www/systemd
-	
-	@# SELinux restrictions on env files in SystemD are really, really stupid
-	@#sudo setenforce 0
-	@#sudo chcon -t unconfined_t /www/tir-na-nog/*.env
-	@#sudo setenforce 1
-	
-	@#sudo cp -f systemd/*.service /etc/systemd/system
-	@#sudo systemctl daemon-reload
+	sudo restorecon -R /www
 
 notices:
 ifdef ADD_GROUP_WWW
@@ -99,37 +76,35 @@ ifdef ADD_GROUP_WWW
 	@printf ' !!!!$(RESET)\n\n'
 endif
 
-/www/caddy/Caddyfile-dev: /www make-caddyfile.py
-	ENVIRONMENT=dev python make-caddyfile.py > $@
-	
-	sudo chown www:www $@
-	sudo chmod 664 $@
-	sudo chcon -u system_u -t httpd_config_t $@
+/www/systemd/www.service: /www /etc/systemd/system/www.service
+	sudo ln -sf /etc/systemd/system/www.service $@
 
-/www/caddy/Caddyfile-prod: /www make-caddyfile.py
-	ENVIRONMENT=prod python make-caddyfile.py > $@
-	
-	sudo chown www:www $@
-	sudo chmod 664 $@
-	sudo chcon -u system_u -t httpd_config_t $@
-
-/etc/systemd/system/www.service: systemd/www.service
+/etc/systemd/system/www.service: systemd/www.service \
+	/www/caddy/Caddyfile-dev /www/caddy/Caddyfile-prod \
+	/www/test-cert.pem
 	sudo cp -f systemd/www.service $@
 	sudo systemctl daemon-reload
 
-/www/systemd/www.service: /etc/systemd/system/www.service /www
-	sudo ln -sf /etc/systemd/system/www.service $@
+/www/caddy/Caddyfile-dev: /www make-caddyfile.py
+	ENVIRONMENT=dev python make-caddyfile.py > $@
+	chmod 664 $@
+
+/www/caddy/Caddyfile-prod: /www make-caddyfile.py
+	ENVIRONMENT=prod python make-caddyfile.py > $@
+	chmod 664 $@
 
 /www/test-cert.pem: /www
 	sudo openssl req -x509 -out $@ -keyout /www/test-key.pem \
 		-newkey rsa:3072 -nodes -sha256 -subj "/CN=$$HOSTNAME" \
 		-days 10000
 
-	sudo chown caddy:caddy /www/*.pem
-	sudo chcon -u system_u -t cert_t /www/*.pem
+	sudo chown caddy /www/*.pem
 
 clean:
-	for FILE in $$(ls systemd); do sudo systemctl stop $$FILE; done
-	for FILE in $$(ls systemd); do sudo systemctl disable $$FILE; done
-	sudo rm /etc/systemd/system/www.service
+	for FILE in $$(ls systemd); do \
+		systemctl list-unit-files $$FILE || continue; \
+		sudo systemctl stop $$FILE; \
+		sudo systemctl disable $$FILE; \
+		sudo rm /etc/systemd/system/www.service; \
+	done
 	sudo rm -rf /www
